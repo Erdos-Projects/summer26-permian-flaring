@@ -1,0 +1,5 @@
+name: summer26-permian-flaring
+channels:
+  - conda-forge
+dependencies: []
+prefix: /Users/vineeth/work/conda_env/envs/summer26-permian-flaring
