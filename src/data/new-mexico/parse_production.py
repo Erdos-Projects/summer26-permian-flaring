@@ -45,8 +45,8 @@ with open(output_csv, 'w', newline='', encoding='utf-8') as csvfile:
                 cnty_node = elem.find(f'{ns}api_cnty_cde')
                 cnty_str = cnty_node.text.strip() if cnty_node is not None and cnty_node.text else ""
                 
-                # Check if County is Lea ('5') or Eddy ('15')
-                if cnty_str in ['5', '15', '05', '015']:
+                # Check if County is Lea ('25') or Eddy ('15')
+                if cnty_str in ['25', '15', '015', '025']:
                     
                     # Extract Product Kind early to filter out Water ('W')
                     knd_node = elem.find(f'{ns}prd_knd_cde')
