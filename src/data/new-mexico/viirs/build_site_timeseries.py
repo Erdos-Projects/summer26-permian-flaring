@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import os
 
 # ==========================================
@@ -26,7 +27,6 @@ df_viirs = df_viirs.dropna(subset=['date_mscan'])
 df_viirs['Year'] = df_viirs['date_mscan'].dt.year
 df_viirs['Month'] = df_viirs['date_mscan'].dt.month
 
-# Expand the baseline to 2012 for the long-term datasets
 df_prod = df_prod[df_prod['Year'] >= 2012]
 df_viirs = df_viirs[df_viirs['Year'] >= 2012]
 df_prod_oil = df_prod[df_prod['Product_Kind'] == 'O'].copy()
@@ -41,10 +41,20 @@ df_basin_waste.rename(columns={'Volume_MCF': 'Basin_Reported_Flared_MCF'}, inpla
 df_basin_oil = df_prod_oil.groupby(['Year', 'Month'])['Volume'].sum().reset_index()
 df_basin_oil.rename(columns={'Volume': 'Basin_Reported_Oil_BBL'}, inplace=True)
 
-df_basin_viirs = df_viirs.groupby(['Year', 'Month'])['rh'].sum().reset_index()
-df_basin_viirs.rename(columns={'rh': 'Basin_VIIRS_Heat_MW'}, inplace=True)
+# Calculate sum of all radiant heat
+df_basin_viirs_sum = df_viirs.groupby(['Year', 'Month'])['rh'].sum().reset_index()
+df_basin_viirs_sum.rename(columns={'rh': 'Basin_VIIRS_Heat_MW_Sum'}, inplace=True)
 
-df_basin_master = pd.merge(df_basin_viirs, df_basin_oil, on=['Year', 'Month'], how='outer')
+# Count clear observations (Cloud Mask == 0)
+df_basin_clear = df_viirs[df_viirs['cloud_mask'] == 0].groupby(['Year', 'Month']).size().reset_index(name='Basin_Clear_Obs')
+
+df_basin_master = pd.merge(df_basin_viirs_sum, df_basin_clear, on=['Year', 'Month'], how='left')
+df_basin_master['Basin_Clear_Obs'] = df_basin_master['Basin_Clear_Obs'].fillna(0)
+
+# Calculate Normalized RH (Safely catching division by zero)
+df_basin_master['Basin_VIIRS_Normalized_MW'] = (df_basin_master['Basin_VIIRS_Heat_MW_Sum'] / df_basin_master['Basin_Clear_Obs']).replace([np.inf, -np.inf], 0).fillna(0)
+
+df_basin_master = pd.merge(df_basin_master, df_basin_oil, on=['Year', 'Month'], how='outer')
 df_basin_master = pd.merge(df_basin_master, df_basin_waste, on=['Year', 'Month'], how='outer').fillna(0)
 df_basin_master['Date'] = pd.to_datetime(df_basin_master[['Year', 'Month']].assign(DAY=1))
 df_basin_master = df_basin_master.sort_values('Date')
@@ -65,8 +75,19 @@ df_prod_oil_mapped = pd.merge(df_prod_oil, df_wells_cw[['API_Number', 'EOG_Site_
 df_site_oil = df_prod_oil_mapped.groupby(['EOG_Site_ID', 'Year', 'Month'])['Volume'].sum().reset_index()
 df_site_oil.rename(columns={'Volume': 'Reported_Oil_Produced_BBL'}, inplace=True)
 
-df_site_viirs = df_viirs.groupby(['site_id', 'Year', 'Month'])['rh'].sum().reset_index()
-df_site_viirs.rename(columns={'site_id': 'EOG_Site_ID', 'rh': 'VIIRS_Heat_MW'}, inplace=True)
+# Calculate sum of site radiant heat
+df_site_viirs_sum = df_viirs.groupby(['site_id', 'Year', 'Month'])['rh'].sum().reset_index()
+df_site_viirs_sum.rename(columns={'rh': 'Site_VIIRS_Heat_MW_Sum'}, inplace=True)
+
+# Count site clear observations
+df_site_clear = df_viirs[df_viirs['cloud_mask'] == 0].groupby(['site_id', 'Year', 'Month']).size().reset_index(name='Site_Clear_Obs')
+
+df_site_viirs = pd.merge(df_site_viirs_sum, df_site_clear, on=['site_id', 'Year', 'Month'], how='left')
+df_site_viirs['Site_Clear_Obs'] = df_site_viirs['Site_Clear_Obs'].fillna(0)
+
+# Calculate Normalized RH (Safely catching division by zero)
+df_site_viirs['VIIRS_Normalized_MW'] = (df_site_viirs['Site_VIIRS_Heat_MW_Sum'] / df_site_viirs['Site_Clear_Obs']).replace([np.inf, -np.inf], 0).fillna(0)
+df_site_viirs.rename(columns={'site_id': 'EOG_Site_ID'}, inplace=True)
 
 df_site_master = pd.merge(df_site_viirs, df_site_oil, on=['EOG_Site_ID', 'Year', 'Month'], how='outer')
 df_site_master = pd.merge(df_site_master, df_site_waste, on=['EOG_Site_ID', 'Year', 'Month'], how='outer').fillna(0)

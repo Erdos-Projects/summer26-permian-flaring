@@ -51,7 +51,9 @@ if os.path.exists(output_file):
 
 header_written = False
 total_rows_written = 0
-TARGET_COLUMNS = ['site_id', 'date_mscan', 'lat_gmtco', 'lon_gmtco', 'temp_bb', 'rh']
+
+# ---> ADDED: 'cloud_mask' to the extraction target <---
+TARGET_COLUMNS = ['site_id', 'date_mscan', 'lat_gmtco', 'lon_gmtco', 'temp_bb', 'rh', 'cloud_mask']
 
 print("\nStarting full historical download (2012-Present)...")
 for idx, site_id in enumerate(unique_site_ids, 1):
@@ -80,7 +82,6 @@ for idx, site_id in enumerate(unique_site_ids, 1):
                     df_site['date_mscan'] = pd.to_datetime(df_site['date_mscan'], errors='coerce')
                     df_site = df_site.dropna(subset=['date_mscan'])
                     
-                    # Expand time barrier back to the start of the VIIRS instrument (2012)
                     df_site = df_site[df_site['date_mscan'].dt.year >= 2012]
                     df_site = df_site.sort_values(by='date_mscan')
                 

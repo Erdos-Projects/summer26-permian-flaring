@@ -23,8 +23,8 @@ print("Building Basin-Wide Historical Dashboard...")
 fig_basin = go.Figure()
 
 fig_basin.add_trace(go.Scatter(
-    x=df_basin['Date'], y=df_basin['Basin_VIIRS_Heat_MW'],
-    mode='lines+markers', name='Observed VIIRS (MW)',
+    x=df_basin['Date'], y=df_basin['Basin_VIIRS_Normalized_MW'],
+    mode='lines+markers', name='Normalized VIIRS Heat (MW/Obs)',
     line=dict(color='#ff4500', width=3)
 ))
 fig_basin.add_trace(go.Scatter(
@@ -42,7 +42,7 @@ fig_basin.update_layout(
     title=dict(text="Permian Basin Macro Audit: 14-Year Historical Profile (2012-2026)", y=0.98),
     template="plotly_dark",
     xaxis=dict(domain=[0.0, 0.85], title="Date"), 
-    yaxis=dict(title=dict(text="VIIRS Radiant Heat (MW)", font=dict(color="#ff4500")), tickfont=dict(color="#ff4500")),
+    yaxis=dict(title=dict(text="Normalized VIIRS (MW/Obs)", font=dict(color="#ff4500")), tickfont=dict(color="#ff4500")),
     yaxis2=dict(title=dict(text="Reported Flared (MCF)", font=dict(color="#00f0ff")), tickfont=dict(color="#00f0ff"), anchor="x", overlaying="y", side="right"),
     yaxis3=dict(title=dict(text="Reported Oil (BBL)", font=dict(color="#00ff66")), tickfont=dict(color="#00ff66"), anchor="free", overlaying="y", side="right", position=0.95),
     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
@@ -64,8 +64,8 @@ for site in unique_sites:
     site_data = df_site[df_site['EOG_Site_ID'] == site]
     
     fig_site.add_trace(go.Scatter(
-        x=site_data['Date'], y=site_data['VIIRS_Heat_MW'],
-        mode='lines+markers', name='Observed VIIRS (MW)',
+        x=site_data['Date'], y=site_data['VIIRS_Normalized_MW'],
+        mode='lines+markers', name='Normalized VIIRS Heat (MW/Obs)',
         line=dict(color='#ff4500', width=2), visible=(site == unique_sites[0])
     ))
     fig_site.add_trace(go.Scatter(
@@ -91,7 +91,7 @@ fig_site.update_layout(
     template="plotly_dark",
     updatemenus=[dict(active=0, buttons=dropdown_buttons, x=0.0, y=1.15, xanchor="left", yanchor="top")],
     xaxis=dict(domain=[0.0, 0.85], title="Date"),
-    yaxis=dict(title=dict(text="VIIRS Radiant Heat (MW)", font=dict(color="#ff4500")), tickfont=dict(color="#ff4500")),
+    yaxis=dict(title=dict(text="Normalized VIIRS (MW/Obs)", font=dict(color="#ff4500")), tickfont=dict(color="#ff4500")),
     yaxis2=dict(title=dict(text="Reported Flared (MCF)", font=dict(color="#00f0ff")), tickfont=dict(color="#00f0ff"), anchor="x", overlaying="y", side="right"),
     yaxis3=dict(title=dict(text="Reported Oil (BBL)", font=dict(color="#00ff66")), tickfont=dict(color="#00ff66"), anchor="free", overlaying="y", side="right", position=0.95),
     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
