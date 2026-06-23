@@ -31,6 +31,9 @@ df_prod = df_prod[df_prod['Year'] >= 2012]
 df_viirs = df_viirs[df_viirs['Year'] >= 2012]
 df_prod_oil = df_prod[df_prod['Product_Kind'] == 'O'].copy()
 
+# Create a master clear-sky dataframe to use for all downstream calculations
+df_viirs_clear = df_viirs[df_viirs['cloud_mask'] == 0].copy()
+
 # ==========================================
 # 2. MACRO: BASIN-WIDE AGGREGATION
 # ==========================================
@@ -41,12 +44,12 @@ df_basin_waste.rename(columns={'Volume_MCF': 'Basin_Reported_Flared_MCF'}, inpla
 df_basin_oil = df_prod_oil.groupby(['Year', 'Month'])['Volume'].sum().reset_index()
 df_basin_oil.rename(columns={'Volume': 'Basin_Reported_Oil_BBL'}, inplace=True)
 
-# Calculate sum of all radiant heat
-df_basin_viirs_sum = df_viirs.groupby(['Year', 'Month'])['rh'].sum().reset_index()
+# Calculate sum of all radiant heat (ONLY for clear observations)
+df_basin_viirs_sum = df_viirs_clear.groupby(['Year', 'Month'])['rh'].sum().reset_index()
 df_basin_viirs_sum.rename(columns={'rh': 'Basin_VIIRS_Heat_MW_Sum'}, inplace=True)
 
-# Count clear observations (Cloud Mask == 0)
-df_basin_clear = df_viirs[df_viirs['cloud_mask'] == 0].groupby(['Year', 'Month']).size().reset_index(name='Basin_Clear_Obs')
+# Count clear observations
+df_basin_clear = df_viirs_clear.groupby(['Year', 'Month']).size().reset_index(name='Basin_Clear_Obs')
 
 df_basin_master = pd.merge(df_basin_viirs_sum, df_basin_clear, on=['Year', 'Month'], how='left')
 df_basin_master['Basin_Clear_Obs'] = df_basin_master['Basin_Clear_Obs'].fillna(0)
@@ -75,12 +78,12 @@ df_prod_oil_mapped = pd.merge(df_prod_oil, df_wells_cw[['API_Number', 'EOG_Site_
 df_site_oil = df_prod_oil_mapped.groupby(['EOG_Site_ID', 'Year', 'Month'])['Volume'].sum().reset_index()
 df_site_oil.rename(columns={'Volume': 'Reported_Oil_Produced_BBL'}, inplace=True)
 
-# Calculate sum of site radiant heat
-df_site_viirs_sum = df_viirs.groupby(['site_id', 'Year', 'Month'])['rh'].sum().reset_index()
+# Calculate sum of site radiant heat (ONLY for clear observations)
+df_site_viirs_sum = df_viirs_clear.groupby(['site_id', 'Year', 'Month'])['rh'].sum().reset_index()
 df_site_viirs_sum.rename(columns={'rh': 'Site_VIIRS_Heat_MW_Sum'}, inplace=True)
 
 # Count site clear observations
-df_site_clear = df_viirs[df_viirs['cloud_mask'] == 0].groupby(['site_id', 'Year', 'Month']).size().reset_index(name='Site_Clear_Obs')
+df_site_clear = df_viirs_clear.groupby(['site_id', 'Year', 'Month']).size().reset_index(name='Site_Clear_Obs')
 
 df_site_viirs = pd.merge(df_site_viirs_sum, df_site_clear, on=['site_id', 'Year', 'Month'], how='left')
 df_site_viirs['Site_Clear_Obs'] = df_site_viirs['Site_Clear_Obs'].fillna(0)
