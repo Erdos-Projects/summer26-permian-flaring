@@ -4,7 +4,7 @@ from lxml import etree as ET
 
 # 1. Setup paths
 project_root = os.path.expanduser('~/work/projects/summer26-permian-flaring')
-input_xml = os.path.join(project_root, 'data/raw/new-mexico/wcproduction.xml')
+input_xml = os.path.join(project_root, 'data/raw/new-mexico/OCD/wcproduction.xml')
 output_dir = os.path.join(project_root, 'data/interim/new-mexico')
 output_csv = os.path.join(output_dir, 'nm_wcproduction_filtered.csv')
 

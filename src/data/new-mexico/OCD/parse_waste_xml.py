@@ -6,10 +6,10 @@ from lxml import etree as ET
 project_root = os.path.expanduser('~/work/projects/summer26-permian-flaring')
 
 # Input from raw data
-input_xml = os.path.join(project_root, 'data/raw/new-mexico/upstreamnaturalgaswaste.xml')
+input_xml = os.path.join(project_root, 'data/raw/new-mexico/OCD/upstreamnaturalgaswaste.xml')
 
 # Output to interim data
-output_csv = os.path.join(project_root, 'data/interim/nm_upstream_waste_nonzero.csv')
+output_csv = os.path.join(project_root, 'data/interim/new-mexico/nm_upstream_waste_nonzero.csv')
 
 # Define the MS SQL namespace
 ns = "{urn:schemas-microsoft-com:sql:SqlRowSet1}"
