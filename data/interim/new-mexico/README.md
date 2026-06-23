@@ -1,14 +1,16 @@
 # Interim Data Dictionary
 
-This document outlines the schemas, granularity, and physical interpretations of the parsed CSV datasets extracted from the raw New Mexico Oil Conservation Division (OCD) administrative registries.
+This document outlines the schemas, granularity, and physical interpretations of the parsed CSV datasets extracted from the raw New Mexico Oil Conservation Division (OCD) administrative registries. All outputs are cleaned, filtered, and optimized for the `summer26-permian-flaring` downstream analysis.
+
+Unless otherwise noted, files are output to `~/work/projects/summer26-permian-flaring/data/interim/new-mexico/`.
 
 ---
 
 ## 1. Production Data
-**File:** `nm_wcproduction_filtered.csv`
-**Source:** `wcproduction.xml`
-**Granularity:** Well-Month (`API_Number` + `Year` + `Month`)
-**Description:** Contains the audited, physical volumes of hydrocarbons extracted from the ground. Filtered exclusively for the Delaware Basin (Lea and Eddy counties) and hydrocarbon streams (Oil and Gas).
+**File:** `nm_wcproduction_filtered.csv`  
+**Source:** `wcproduction.xml`  
+**Granularity:** Well-Month (`API_Number` + `Year` + `Month`)  
+**Description:** Contains the audited, physical volumes of hydrocarbons extracted from the ground. Filtered exclusively for the Delaware Basin (Lea and Eddy counties) and hydrocarbon streams (Oil and Gas).  
 
 | Column | Type | Description |
 | :--- | :--- | :--- |
@@ -22,10 +24,10 @@ This document outlines the schemas, granularity, and physical interpretations of
 ---
 
 ## 2. Gas Sales (Delivery) Data
-**File:** `nm_gas_sold.csv`
-**Source:** `podvolume.xml`
-**Granularity:** Operator-Month (`Operator_ID` + `Year` + `Month`)
-**Description:** Represents the volume of gas successfully pushed into commercial midstream pipelines (Disposition Code 'D'). Crucial for calculating the Sales-to-Production ratio and determining system shrinkage.
+**File:** `nm_gas_sold.csv`  
+**Source:** `podvolume.xml`  
+**Granularity:** Operator-Month (`Operator_ID` + `Year` + `Month`)  
+**Description:** Represents the volume of gas successfully pushed into commercial midstream pipelines (Disposition Code 'D'). Crucial for calculating the Sales-to-Production ratio and determining system shrinkage. Aggregated at the Operator level for economic/company-level analysis.  
 
 | Column | Type | Description |
 | :--- | :--- | :--- |
@@ -37,10 +39,10 @@ This document outlines the schemas, granularity, and physical interpretations of
 ---
 
 ## 3. Modern Waste & Flaring Data (2021–Present)
-**File:** `nm_upstream_waste_nonzero.csv`
-**Source:** `upstreamnaturalgaswaste.xml`
-**Granularity:** Operator-Event/Month
-**Description:** The strict environmental logs mandated by the 2021 Waste Rule. Tracks gas that was physically combusted (flared) or released (vented) into the atmosphere. Zero-volume rows are explicitly dropped to conserve memory.
+**File:** `nm_upstream_waste_nonzero.csv`  
+**Source:** `upstreamnaturalgaswaste.xml`  
+**Granularity:** Operator-Event/Month  
+**Description:** The strict environmental logs mandated by the 2021 Waste Rule. Tracks gas that was physically combusted (flared) or released (vented) into the atmosphere. Zero-volume rows are explicitly dropped to conserve memory.  
 
 | Column | Type | Description |
 | :--- | :--- | :--- |
@@ -57,10 +59,10 @@ This document outlines the schemas, granularity, and physical interpretations of
 ---
 
 ## 4. Modern Beneficial Use Data (2021–Present)
-**File:** `nm_upstream_beneficial_use_nonzero.csv`
-**Source:** `upstreamnaturalgaswastebeneficialuse.xml`
-**Granularity:** Operator-Event/Month
-**Description:** Tracks un-sold gas that was intercepted and utilized by the operator for lease operations (e.g., powering compressor engines or gas-lift mechanics).
+**File:** `nm_upstream_beneficial_use_nonzero.csv`  
+**Source:** `upstreamnaturalgaswastebeneficialuse.xml`  
+**Granularity:** Operator-Event/Month  
+**Description:** Tracks un-sold gas that was intercepted and utilized by the operator for lease operations (e.g., powering compressor engines or gas-lift mechanics). Filtered strictly to events with volumes greater than zero.  
 
 | Column | Type | Description |
 | :--- | :--- | :--- |
@@ -72,15 +74,15 @@ This document outlines the schemas, granularity, and physical interpretations of
 | `use_type` | Category | Standardized code for how the gas was utilized. |
 | `use_type_other` | String | Free-text field for non-standard uses. |
 | `volume` | Float | The volume of gas burned for operational power (MCF). |
-| `saved` | Datetime | Administrative timestamp of the log entry. |
+| `saved` | String | Administrative indication of volumes successfully conserved. |
 
 ---
 
 ## 5. Wellhead Spatial Registry
-**File:** `nm_wells_spatial.csv`
-**Source:** `New_Mexico_OCD_Oil_and_Gas_Wells.csv`
-**Granularity:** Well (`API_Number`)
-**Description:** The master crosswalk linking standard administrative well IDs to physical earth coordinates. Essential for generating spatial buffers to intersect with VIIRS Nightfire thermal satellite anomalies.
+**File:** `nm_wells_spatial.csv`  
+**Source:** `New_Mexico_OCD_Oil_and_Gas_Wells.csv`  
+**Granularity:** Well (`API_Number`)  
+**Description:** The master crosswalk linking standard administrative well IDs to physical earth coordinates. Essential for generating spatial buffers to intersect with VIIRS Nightfire thermal satellite anomalies. Filtered strictly for the Permian Basin.  
 
 | Column | Type | Description |
 | :--- | :--- | :--- |
@@ -95,10 +97,10 @@ This document outlines the schemas, granularity, and physical interpretations of
 ---
 
 ## 6. Surface Infrastructure Spatial Registry
-**File:** `nm_facilities.csv`
-**Source:** `facility.xml`
-**Granularity:** Facility (`id`)
-**Description:** Maps the physical locations of midstream hardware (compressor stations, gathering satellites, below-grade tanks). Used to identify spatial chokepoints in the pipeline network.
+**File:** `nm_facilities.csv`  
+**Source:** `facility.xml`  
+**Granularity:** Facility (`id`)  
+**Description:** Maps the physical locations of midstream hardware (compressor stations, gathering satellites, below-grade tanks). Used to identify spatial chokepoints in the pipeline network. Flattened from deeply nested XML nodes.  
 
 | Column | Type | Description |
 | :--- | :--- | :--- |
@@ -110,15 +112,41 @@ This document outlines the schemas, granularity, and physical interpretations of
 | `status` | String | Full text description of the status. |
 | `ogrid` | String | Operator ID. |
 | `ogrid_name` | String | Full company name. |
+| `district_code` | String | OCD regional district. |
+| `district` | String | OCD regional district name. |
 | `county_code` | String | FIPS code. |
+| `county` | String | County name. |
+| `ulstr` | String | Unit Letter, Section, Township, Range description. |
 | `latitude` | Float | NAD83 Y-coordinate. |
 | `longitude` | Float | NAD83 X-coordinate. |
-| `effective_date` | Datetime| When the facility came online. |
+| `effective_date` | Datetime| Temporal tracking field indicating when the facility came online. |
+| `last_edited_on` | Datetime| Temporal tracking field indicating when the facility was last modified. |
 
 ---
 
-## 7. Legacy Mapping Dictionary
-**File:** `nm_pod_to_api_mapping.csv`
-**Source:** Internally generated crosswalk
-**Granularity:** POD-API Link
-**Description:** Used exclusively to bridge the gap in pre-2021 data by mapping communal Point of Delivery (POD) meters back to the specific wellbores that feed them.
+## 7. Legacy Flaring Panel Data (2015-2020)
+**File:** `nm_legacy_flaring_2015_2020.csv` *(Note: Saved to data/interim/, bypassing the new-mexico subfolder)* **Source:** `podvolume.xml`  
+**Granularity:** Well-Month (`API_Number` + `Year` + `Month`)  
+**Description:** The primary pre-treatment historical flaring dataset for the Difference-in-Differences (DiD) analysis. Contains only Flaring ('F') and Venting ('V') volumes, strictly bounded between 2015 and 2020. Merged to specific APIs using the POD crosswalk.  
+
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| `API_Number` | String | Linked 10-digit API identifier. |
+| `Year` | Integer | Flaring/Venting year. |
+| `Month` | Integer | Flaring/Venting month. |
+| `Volume_MCF` | Float | Disposed volume. |
+| `Disposition_Code` | String | 'F' (Flaring) or 'V' (Venting). |
+| `Well_Count` | Integer | Number of wells sharing this POD volume. Used downstream to divide/allocate volumes properly and prevent double-counting. |
+
+---
+
+## 8. Legacy Mapping Dictionary
+**File:** `nm_pod_to_api_mapping.csv`  
+**Source:** `podwc.xml`  
+**Granularity:** POD-API Link  
+**Description:** A vital relational mapping table connecting aggregate POD identifiers to specific, well-level standard 10-digit API numbers. Used exclusively to bridge the gap in pre-2021 data by mapping communal Point of Delivery (POD) meters back to the specific wellbores that feed them. Contains only unique pairs to act as a clean crosswalk table.  
+
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| `POD_ID` | String | Point of Delivery identifier. |
+| `API_Number` | String | Standard 10-digit well identifier. |

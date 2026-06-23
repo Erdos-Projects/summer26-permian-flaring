@@ -8,7 +8,7 @@ project_root = os.path.expanduser('~/work/projects/summer26-permian-flaring')
 
 mapping_csv = os.path.join(project_root, 'data/interim/new-mexico/nm_pod_to_api_mapping.csv')
 input_xml = os.path.join(project_root, 'data/raw/new-mexico/podvolume.xml')
-output_csv = os.path.join(project_root, 'data/interim/nm_legacy_flaring_2015_2020.csv')
+output_csv = os.path.join(project_root, 'data/interim/new-mexico/nm_legacy_flaring_2015_2020.csv')
 
 # Define the MS SQL namespace
 ns = "{urn:schemas-microsoft-com:sql:SqlRowSet1}"
