@@ -35,10 +35,10 @@ for site in unique_sites:
     
     # Trace 1: VIIRS Radiant Heat (Primary Y-Axis)
     fig.add_trace(go.Scatter(
-        x=site_data['Date'], y=site_data['VIIRS_Radiant_Heat_Sum'],
+        x=site_data['Date'], y=site_data['Site_VIIRS_Heat_MW_Sum'], # <-- Updated here
         mode='lines+markers', name='VIIRS Heat (MW)',
         line=dict(color='#ff4500', width=2),
-        visible=(site == unique_sites[0]) # Only the first site is visible by default
+        visible=(site == unique_sites[0]) 
     ))
     
     # Trace 2: Reported Flared MCF (Secondary Y-Axis)
