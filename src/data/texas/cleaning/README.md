@@ -1,358 +1,345 @@
-# Texas PDQ Data Cleaning Pipeline
+# Texas RRC Oil Production Data Pipeline
 
-This folder contains a sequential pipeline of Jupyter notebooks that extract, clean, and spatially enrich Texas oil production data sourced from the **Railroad Commission of Texas (RRC) Production Data Query (PDQ) Dump**. and **. Well Layers By County**.
-
-**Source:** [RRC Data Sets Available for Download](https://www.rrc.texas.gov/resource-center/research/data-sets-available-for-download/)  
-**Raw data:**  PDQ: `summer26-permian-flaring/data/raw/texas/texas_pdq.zip`  and Well Layers By County: `summer26-permian-flaring/data/raw/texas/Wells/texas_pdq.zip`
-**Outputs:** `summer26-permian-flaring/data/raw/texas/cleaned_data/`
-
-Note: `summer26-permian-flaring/data/` is not tracked by git
-
-> ⚠️ **The notebooks must be run in the order listed below.** Each notebook depends on output files produced by the one before it.
+This folder contains Jupyter notebooks that extract, clean, and geo-locate oil production data from the Texas Railroad Commission (RRC) Production Data Query (PDQ) dump. The notebooks must be run **in the order listed below**, as each notebook depends on outputs from the previous one.
 
 ---
 
-## Pipeline Overview
+## Data Source
+
+**Texas Railroad Commission — [Data Sets Available for Download](https://www.rrc.texas.gov/resource-center/research/data-sets-available-for-download/)**
+
+Two raw datasets are used:
+
+| Dataset | Local Path |
+|---|---|
+| Production Data Query (PDQ) dump | `summer26-permian-flaring/data/raw/texas/texas_pdq.zip` |
+| Well Layers By County (shapefiles) | `summer26-permian-flaring/data/raw/texas/Wells/` |
+
+The PDQ dump is a complete export of the RRC's production and historical ledger databases, covering **1993 to present**, updated monthly. It is delivered as a nested zip: `texas_pdq.zip` → `PDQ_DSV.zip` → individual `.dsv` files delimited by `}`. Raw data is large (>25 GB uncompressed; ~5 GB compressed). The Well Layers By County dataset contains 255 per-county zip files, each holding shapefiles with well location geometry.
+
+---
+
+## Output Directory
+
+All cleaned outputs are saved to:
 
 ```
-texas_prod_disp_cleaned.ipynb
-        │
-        ▼  texas_total_prod.parquet
-        │  texas_prod_disp.parquet
-        │
-texas_well_lease_api.ipynb
-        │
-        ▼  well_api_lease.parquet
-        │
-texas_lease_level_coordinate_centroid.ipynb
-        │
-        ▼  lease_well_coordinates.geoparquet
-           wells_per_lease.parquet
-        │
-texas_well_disp_coord.ipynb
-        │
-        ▼  prod_per_well_approx.parquet
-           prod_per_well_approx.geoparquet
+summer26-permian-flaring/data/raw/texas/cleaned_data/
+```
+
+Permian Basin subsets are saved to:
+
+```
+summer26-permian-flaring/data/raw/texas/cleaned_data/permian_only/
 ```
 
 ---
 
-## Background
+## Notebook Execution Order
 
-Texas RRC production data is reported at the **lease level**, not the well level. A single lease may contain multiple wells. This pipeline:
+### 1. `texas_prod_disp_cleaned.ipynb` — Production & Disposition Data
 
-1. Extracts lease-level oil production and disposition data from the PDQ dump.
-2. Extracts the well-to-lease mapping and API numbers from well completion records.
-3. Joins API numbers to county-level shapefiles to obtain well coordinates, then computes a **centroid per lease** as a spatial proxy.
-4. Merges production/disposition data with well coordinates and distributes lease-level volumes equally across all wells in the lease to produce an **approximate well-level dataset**.
+**Purpose:** Extracts oil production volumes and oil/gas disposition breakdowns for every oil lease in Texas from 1993 to present. This is the primary production dataset.
 
-The PDQ dump covers oil and gas production from **1993 to the present**, updated monthly. This pipeline filters for **oil leases only** (`OIL_GAS_CODE = "O"`). The gas data included is **casinghead gas (CSGD)** — natural gas co-produced with crude oil — and is not from standalone gas wells.
+**Source tables inside `PDQ_DSV.zip`:**
+- `OG_LEASE_CYCLE_DATA_TABLE.dsv` — monthly lease-level production volumes
+- `OG_LEASE_CYCLE_DISP_DATA_TABLE.dsv` — how produced oil and casinghead gas were disposed of
 
----
-
-## Notebooks
-
-### 1. `texas_prod_disp_cleaned.ipynb`
-**Purpose:** Extract lease-level oil production volumes and disposition breakdowns from the PDQ dump.
-
-**Reads from raw zip:**
-- `OG_LEASE_CYCLE_DATA_TABLE.dsv` — monthly production volumes per lease
-- `OG_LEASE_CYCLE_DISP_DATA_TABLE.dsv` — how produced oil and gas was disposed of (pipeline, truck, flared, etc.)
-
-**Key processing steps:**
-- Filters to oil leases (`OIL_GAS_CODE = "O"`)
-- Retains columns for lease identity, production month, oil production volume, casinghead gas volume, operator, and field
-- Parses `CYCLE_YEAR_MONTH` (YYYYMM) into a proper `date` column
-- Drops rows with no oil production (`LEASE_OIL_PROD_VOL` is null)
-- Renames raw disposition code columns to human-readable names (e.g., `LEASE_OIL_DISPCD00_VOL` → `oil_pipeline_bbl`)
-- Computes derived columns:
-  - `oil_sold_total_bbl` — sum of pipeline + truck + tank car dispositions
-  - `total_vented_flared_mcf` — total gas vented or flared
-  - `total_gas_to_processing_mcf` — total gas sent to processing plant
-- Drops rows with no oil sold (`oil_sold_total_bbl` is null)
+**Key decisions:**
+- Filters to **oil leases only** (`OIL_GAS_CODE == "O"`). Gas production captured here is casinghead gas (gas dissolved in crude oil and produced alongside it), not gas from gas wells.
+- Texas RRC data is **lease-level only** — there is no public well-level production. One lease may contain multiple wells.
+- Rows with no oil production volume (`LEASE_OIL_PROD_VOL` is null or zero) are dropped.
+- A `date` column (datetime) is derived from `CYCLE_YEAR_MONTH`.
 
 **Outputs:**
+
 | File | Description |
-|------|-------------|
-| `texas_total_prod.parquet` | Lease-month production volumes (oil + casinghead gas) |
-| `texas_prod_disp.parquet` | Lease-month disposition breakdown with derived flaring/sales columns |
+|---|---|
+| `texas_total_prod.parquet` | Monthly oil production and casinghead gas production per lease |
+| `texas_prod_disp.parquet` | Monthly oil and casinghead gas disposition breakdown per lease |
 
 ---
 
-### 2. `texas_well_lease_api.ipynb`
-**Purpose:** Extract the mapping between wells, leases, and API numbers from the well completion table.
+### 2. `texas_well_lease_api.ipynb` — Well–Lease–API Linkage
 
-**Reads from raw zip:**
-- `OG_WELL_COMPLETION_DATA_TABLE.dsv` — well completion records linking wells to leases and API numbers
+**Purpose:** Extracts the mapping between wells and leases, along with each well's 8-digit API number. This is needed to look up well coordinates from the shapefile data.
 
-**Key processing steps:**
-- Filters to oil wells (`OIL_GAS_CODE = "O"`)
-- Retains district, lease number, well number, county, wellbore location code, and API components
-- Constructs a full 8-digit RRC API number: `API_NO = API_COUNTY_CODE (3 digits) + API_UNIQUE_NO (5 digits)`
+**Source table inside `PDQ_DSV.zip`:**
+- `OG_WELL_COMPLETION_DATA_TABLE.dsv` — one row per well, with its lease number, district, and API county/unique code components
+
+**Key decisions:**
+- Filters to oil wells only (`OIL_GAS_CODE == "O"`).
+- Constructs the 8-digit RRC API number (`API_NO`) by zero-padding and concatenating `API_COUNTY_CODE` (3 digits) and `API_UNIQUE_NO` (5 digits). This API8 format matches the RRC's well shapefile data.
+
+**Output:**
+
+| File | Description |
+|---|---|
+| `well_api_lease.parquet` | ~587k rows linking each oil well to its lease and district, with API8 identifier |
+
+---
+
+### 3. `texas_lease_level_coordinate_centroid.ipynb` — Coordinate Assignment
+
+**Purpose:** Joins each well's API number to its geographic coordinates (from RRC shapefiles), then computes a **centroid of all wells per lease** to assign a single representative location to each lease. Also joins these lease centroids to the total production data.
+
+**Source files:**
+- `cleaned_data/texas_total_prod.parquet` (from Step 1)
+- `cleaned_data/well_api_lease.parquet` (from Step 2)
+- `data/raw/texas/Wells/*.zip` — 255 per-county zipped shapefiles from the RRC Well Layers By County dataset
+
+**Key decisions:**
+- Shapefiles are in NAD27 (EPSG:4267); all geometries are reprojected to WGS84 (EPSG:4326).
+- Only **Point and MultiPoint** geometries are retained (surface and unknown layer types preferred over bottom-hole locations).
+- A **stable lease key** (`oil_gas_code_norm + "_" + district_no_norm + "_" + lease_no_norm`) is constructed to join production and well data consistently across files.
+- The centroid is computed in Texas Centric Albers projection (EPSG:3083) for accuracy, then converted back to WGS84 lon/lat.
+- Because one lease may have multiple wells, joining production to individual wells would duplicate production rows. The centroid approach provides a single spatial anchor per lease without inflating production volumes.
 
 **Outputs:**
+
 | File | Description |
-|------|-------------|
-| `well_api_lease.parquet` | Well-to-lease mapping with 8-digit API numbers; ~587K rows |
+|---|---|
+| `lease_well_coordinates.parquet` | All wells with their API8, lease key, and individual coordinates (flat) |
+| `lease_well_coordinates.geoparquet` | Same, with geometry column (GeoParquet format) |
+| `wells_per_lease.parquet` | One row per lease: lease key, well count, centroid latitude/longitude |
+| `tot_prod_with_lease_coord.parquet` | Total production joined to lease centroid coordinates (flat) |
+| `tot_prod_with_lease_coord.geoparquet` | Same, with geometry column (GeoParquet format) |
 
 ---
 
-### 3. `texas_lease_level_coordinate_centroid.ipynb`
-**Purpose:** Join API numbers to RRC GIS shapefiles to obtain well coordinates, then compute a centroid coordinate per lease.
+### 4. `texas_well_disp_coord.ipynb` — Well-Approximated Disposition Data with Coordinates
 
-**Reads:**
-- `cleaned_data/texas_total_prod.parquet`
-- `cleaned_data/well_api_lease.parquet`
-- `data/raw/texas/Wells/` — 255 county-level shapefile zips from the RRC [Well Layers by County](https://www.rrc.texas.gov/resource-center/research/data-sets-available-for-download/) dataset
+**Purpose:** Combines oil/gas disposition data with well coordinates to produce an **approximate well-level dataset**. Since Texas does not publish well-level production, each lease's production is divided equally among its wells to create a per-well proxy.
 
-**Key processing steps:**
-- Constructs a composite `lease_key` (`OIL_GAS_CODE_DISTRICT_NO_LEASE_NO`) to uniquely identify leases across both files
-- Normalizes API numbers to the 8-digit RRC format (`API8 = county_3digits + unique_5digits`), handling 8-, 10-, and 12-digit variants
-- Reads all 255 county shapefiles, projects coordinates from NAD27 to WGS84 (EPSG:4326), and keeps only point geometries
-- Matches well GIS records to the lease/well table on `api8`
-- Computes a **centroid** of all well point coordinates within each lease as the lease's spatial representative
-- Counts the number of wells with valid coordinates per lease (`n_wells_with_coordinates`)
+**Source files:**
+- `cleaned_data/texas_prod_disp.parquet` (from Step 1)
+- `cleaned_data/lease_well_coordinates.geoparquet` (from Step 3)
+- `cleaned_data/wells_per_lease.parquet` (from Step 3)
+
+**Key decisions:**
+- Data is filtered to records **after 2011-01-01** to focus on recent production.
+- Each well in a lease is assigned the full lease geometry point from the well shapefile (not the centroid). This means one lease-month row becomes N rows, one per well.
+- All production/disposition volumes are then **divided by the number of wells with coordinates** (`n_wells_with_coordinates`) to create the per-well approximation.
+- ⚠️ **Important caveat:** This equal-split assumption is a simplification. Individual wells within a lease may produce very different volumes. These outputs should be treated as spatial proxies, not precise well-level measurements.
 
 **Outputs:**
+
 | File | Description |
-|------|-------------|
-| `lease_well_coordinates.geoparquet` | Per-well coordinates joined to lease keys; geometry in WGS84 |
-| `wells_per_lease.parquet` | Count of wells with coordinates per lease, plus centroid lat/lon |
+|---|---|
+| `prod_per_well_approx.parquet` | Approx. well-level monthly disposition data with lat/lon (flat) |
+| `prod_per_well_approx.geoparquet` | Same, with geometry column (GeoParquet format) |
 
 ---
 
-### 4. `texas_well_disp_coord.ipynb`
-**Purpose:** Combine production/disposition data with well coordinates and distribute lease-level volumes to approximate well-level production.
+### 5. `permian_basin.ipynb` — Permian Basin Subset
 
-**Reads:**
-- `cleaned_data/texas_prod_disp.parquet`
-- `cleaned_data/lease_well_coordinates.geoparquet`
-- `cleaned_data/wells_per_lease.parquet`
+**Purpose:** Filters all four cleaned datasets to the **Permian Basin geographic bounding box** and exports as CSV for downstream analysis.
 
-**Key processing steps:**
-- Reconstructs `lease_key` on the production table for joining
-- Left-joins production rows to well coordinates on `lease_key` — if a lease has N wells, this creates N rows per month, each carrying the full lease volume
-- Merges in `wells_per_lease` to get `n_wells_with_coordinates`
-- Drops minor disposition columns to reduce memory footprint
-- Divides all production/disposition volume columns by `n_wells_with_coordinates` to distribute the lease volume equally across wells
+**Source files** (all from `cleaned_data/`):
+- `lease_well_coordinates.geoparquet`
+- `wells_per_lease.parquet`
+- `tot_prod_with_lease_coord.geoparquet`
+- `prod_per_well_approx.geoparquet`
 
-> ⚠️ **Interpretation note:** The resulting per-well volumes are an equal-split approximation. They do not reflect actual measured per-well production. Use with appropriate caution.
+**Bounding box used:**
 
-**Retained disposition columns after cleanup:**
-- `oil_pipeline_bbl`, `oil_truck_bbl`
-- `csgd_field_ops_fuel_mcf`, `csgd_transmission_mcf`, `csgd_processing_plant_mcf`
-- `csgd_vented_flared_mcf`, `csgd_gas_lift_mcf`, `csgd_repressure_mcf`
-- `oil_sold_total_bbl`, `total_vented_flared_mcf`
+| Bound | Value |
+|---|---|
+| Latitude min | 29.462935° N |
+| Latitude max | 34.021515° N |
+| Longitude min | −105.21988° W |
+| Longitude max | −100.036107° W |
 
-**Outputs:**
+**Outputs** (all in `cleaned_data/permian_only/`):
+
 | File | Description |
-|------|-------------|
-| `prod_per_well_approx.parquet` | Approximate well-level production/disposition data (no geometry) |
-| `prod_per_well_approx.geoparquet` | Same, with point geometry for each well |
+|---|---|
+| `permian_wells_with_locn_and_id.csv` | Individual wells in the Permian with coordinates and lease key |
+| `permian_wells_per_lease.csv` | Lease-level well counts and centroid coordinates, Permian only |
+| `permian_tot_prod_with_lease_coord.csv` | Total monthly production with lease centroids, Permian only |
+| `permian_prod_per_well_approx.csv` | Approx. well-level monthly disposition data, Permian only |
+| `permian_prod_per_well_approx_small.csv` | Same, with minor non-essential columns dropped |
 
 ---
 
-## Output File Summary
-
-All outputs land in `summer26-permian-flaring/data/raw/texas/cleaned_data/`.
-
-| File | Produced by | Description |
-|------|-------------|-------------|
-| `texas_total_prod.parquet` | Notebook 1 | Lease-month oil + CSGD production volumes |
-| `texas_prod_disp.parquet` | Notebook 1 | Lease-month oil and gas disposition breakdown |
-| `well_api_lease.parquet` | Notebook 2 | Well → lease → API number mapping |
-| `lease_well_coordinates.geoparquet` | Notebook 3 | Per-well coordinates joined to lease keys |
-| `wells_per_lease.parquet` | Notebook 3 | Well count and centroid per lease |
-| `prod_per_well_approx.parquet` | Notebook 4 | Approximate well-level production (tabular) |
-| `prod_per_well_approx.geoparquet` | Notebook 4 | Approximate well-level production (spatial) |
-
----
-
-## Output Column Descriptions
+## Column Definitions
 
 ### `texas_total_prod.parquet`
-Grain: one row per lease per production month. Only leases with at least one barrel of oil production are included.
 
 | Column | Type | Description |
-|--------|------|-------------|
-| `oil_gas_code` | category | Always `"O"` (oil leases only) |
-| `district_no` | category | RRC district number (e.g. `"08"`, `"7B"`) |
-| `lease_no` | string | RRC lease number; unique within a district |
-| `field_no` | string | 8-digit RRC field number |
-| `lease_oil_prod_vol` | float | Oil produced in barrels (BBL); null if zero |
-| `lease_csgd_prod_vol` | float | Casinghead gas produced in MCF; null if zero |
-| `lease_csgd_tot_disp` | float | Total casinghead gas disposed of in MCF |
-| `operator_no` | string | RRC-assigned operator ID |
-| `operator_name` | string | Operator name as filed on RRC Form P-5 |
-| `date` | datetime | Production month parsed from `CYCLE_YEAR_MONTH` (first day of month) |
+|---|---|---|
+| `oil_gas_code` | category | Always `"O"` (oil leases only in this dataset) |
+| `district_no` | category | RRC district number (e.g., `"08"`). The 14 RRC districts are numbered 01–06, 6E, 7B, 7C, 08, 8A, 09, 10. |
+| `lease_no` | str | RRC-assigned lease number, unique within a district |
+| `field_no` | str | 8-digit RRC field number (first 5 digits identify the field, last 3 identify the reservoir) |
+| `lease_oil_prod_vol` | float | Oil produced in **barrels (BBL)** for the month, as reported by the operator |
+| `lease_csgd_prod_vol` | float | Casinghead gas produced in **MCF** for the month. Casinghead gas is natural gas dissolved in crude oil and produced alongside it |
+| `lease_csgd_tot_disp` | float | Total casinghead gas disposed of in **MCF** (sum of all disposition codes) |
+| `operator_no` | str | RRC-assigned operator ID number |
+| `operator_name` | str | Operator name as filed on RRC Form P-5 |
+| `date` | datetime | Production month (first day of the month; derived from `CYCLE_YEAR_MONTH`) |
+| `lease_key` | str | Constructed stable identifier: `{oil_gas_code}_{district_no}_{lease_no}` (e.g., `O_08_00277`). Used to join across all pipeline files. |
 
 ---
 
 ### `texas_prod_disp.parquet`
-Grain: one row per lease per production month. Only leases with a non-null `oil_sold_total_bbl` are included.
 
-**Identity columns**
+Contains the same key/identifier columns as above plus the following disposition breakdowns. Oil volumes are in **BBL**; casinghead gas volumes are in **MCF**.
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `oil_gas_code` | category | Always `"O"` |
-| `district_no` | category | RRC district number |
-| `lease_no` | string | RRC lease number |
-| `field_no` | string | RRC field number |
-| `operator_no` | string | RRC operator ID |
-| `operator_name` | string | Operator name |
-| `date` | datetime | Production month |
+**Key/identifier columns:**
 
-**Oil disposition columns** (units: BBL)
+| Column | Description |
+|---|---|
+| `oil_gas_code` | Always `"O"` |
+| `district_no` | RRC district number |
+| `lease_no` | RRC lease number |
+| `field_no` | RRC field number |
+| `operator_no` | RRC operator ID |
+| `operator_name` | Operator name |
+| `date` | Production month (datetime) |
+| `lease_key` | Stable join key (see above) |
 
-| Column | Source code | Description |
-|--------|-------------|-------------|
-| `oil_pipeline_bbl` | `DISPCD00` | Oil moved off lease by pipeline |
-| `oil_truck_bbl` | `DISPCD01` | Oil moved off lease by truck |
-| `oil_tankcar_bbl` | `DISPCD02` | Oil moved off lease by tank car or barge |
-| `oil_tank_cleaning_bbl` | `DISPCD03` | Net oil recovered during tank cleaning |
-| `oil_circulating_bbl` | `DISPCD04` | Oil used for circulating purposes |
-| `oil_lost_stolen_bbl` | `DISPCD05` | Oil lost or stolen |
-| `oil_bsw_repressure_bbl` | `DISPCD06` | BS&W from tank cleaning used in repressure |
-| `oil_legacy_bbl` | `DISPCD07` | Legacy catch-all code (not used in current system) |
-| `oil_skimmed_bbl` | `DISPCD08` | Oil allocated back from Form P-18 (skim oil) |
-| `oil_scrubber_bbl` | `DISPCD09` | Oil attributed to scrubber (not used) |
-| `oil_no_disp_code_bbl` | `DISPCD99` | Oil reported without a disposition code |
+**Oil disposition columns (BBL):**
 
-**Casinghead gas (CSGD) disposition columns** (units: MCF)
+| Column | Description |
+|---|---|
+| `oil_pipeline_bbl` | Oil transferred off-lease by **pipeline** |
+| `oil_truck_bbl` | Oil transferred off-lease by **truck** |
+| `oil_tankcar_bbl` | Oil transferred off-lease by **tank car or barge** |
+| `oil_tank_cleaning_bbl` | Net oil recovered during **tank cleaning** |
+| `oil_circulating_bbl` | Oil used for **lease circulating purposes** |
+| `oil_lost_stolen_bbl` | Oil **lost or stolen** (Form H-8 required if > 5 BBL) |
+| `oil_bsw_repressure_bbl` | BS&W from tank cleaning used in **repressure/pressure maintenance** |
+| `oil_legacy_bbl` | Legacy code for oil not fitting another category (not used in current system) |
+| `oil_skimmed_bbl` | Oil allocated back from Form P-18 (**skim oil**) |
+| `oil_scrubber_bbl` | Oil attributed to the lease for **scrubber oil** (legacy; not used) |
+| `oil_no_disp_code_bbl` | Oil reported **without a disposition code** |
+| `oil_sold_total_bbl` | **Derived:** sum of `oil_pipeline_bbl + oil_truck_bbl + oil_tankcar_bbl` — total oil moved off-lease (proxy for sales volume) |
 
-| Column | Source code | Description |
-|--------|-------------|-------------|
-| `csgd_field_ops_fuel_mcf` | `DISPCDE01` | Gas used for field operations / lease drilling / compressor fuel |
-| `csgd_transmission_mcf` | `DISPCDE02` | Gas delivered directly to a transmission line |
-| `csgd_processing_plant_mcf` | `DISPCDE03` | Gas sent to a processing plant |
-| `csgd_vented_flared_mcf` | `DISPCDE04` | Gas vented or flared |
-| `csgd_gas_lift_mcf` | `DISPCDE05` | Gas used directly for gas lift |
-| `csgd_repressure_mcf` | `DISPCDE06` | Gas used for repressure / pressure maintenance |
-| `csgd_carbon_black_mcf` | `DISPCDE07` | Gas sent to a carbon black plant |
-| `csgd_underground_storage_mcf` | `DISPCDE08` | Gas injected into underground storage |
-| `csgd_no_disp_code_mcf` | `DISPCDE99` | Gas reported without a disposition code |
+**Casinghead gas disposition columns (MCF):**
 
-**Derived columns**
-
-| Column | Units | Description |
-|--------|-------|-------------|
-| `oil_sold_total_bbl` | BBL | Sum of pipeline + truck + tank car oil dispositions |
-| `total_vented_flared_mcf` | MCF | Sum of gas well gas + casinghead gas vented or flared |
-| `total_gas_to_processing_mcf` | MCF | Sum of gas well gas + casinghead gas sent to processing plant |
+| Column | Description |
+|---|---|
+| `csgd_field_ops_fuel_mcf` | Casinghead gas used for **field operations** (lease drilling fuel, compressor fuel, etc.) |
+| `csgd_transmission_mcf` | Casinghead gas delivered to a **transmission line** (not processed further) |
+| `csgd_processing_plant_mcf` | Casinghead gas sent to a **processing plant** |
+| `csgd_vented_flared_mcf` | Casinghead gas **vented or flared** |
+| `csgd_gas_lift_mcf` | Casinghead gas used for **gas lift** |
+| `csgd_repressure_mcf` | Casinghead gas used for **repressure or pressure maintenance** |
+| `csgd_carbon_black_mcf` | Casinghead gas sent to a **carbon black plant** |
+| `csgd_underground_storage_mcf` | Casinghead gas injected into **underground storage** |
+| `csgd_no_disp_code_mcf` | Casinghead gas reported **without a disposition code** |
+| `total_vented_flared_mcf` | **Derived:** casinghead gas vented or flared (equals `csgd_vented_flared_mcf` for oil leases; would include gas well flaring if gas leases were included) |
+| `total_gas_to_processing_mcf` | **Derived:** total gas sent to processing plant (equals `csgd_processing_plant_mcf` for oil leases) |
 
 ---
 
 ### `well_api_lease.parquet`
-Grain: one row per well completion record. Multiple rows per lease (one per well on the lease).
 
 | Column | Type | Description |
-|--------|------|-------------|
+|---|---|---|
 | `oil_gas_code` | category | Always `"O"` |
 | `district_no` | category | RRC district number |
-| `lease_no` | string | RRC lease number |
-| `well_no` | string | Well number; unique within a lease |
-| `api_county_code` | string | 3-digit RRC/API county code |
-| `api_unique_no` | string | 5-digit API unique well number |
-| `county_name` | string | County name |
-| `wellbore_location_code` | category | Location type: `L` (land), `O` (offshore), `I` (inland waterway), `B` (bay/estuary) |
-| `api_no` | string | Full 8-digit RRC API number: `API_COUNTY_CODE (3 digits) + API_UNIQUE_NO (5 digits)` |
+| `lease_no` | str | RRC lease number |
+| `well_no` | str | Well number, unique within a lease |
+| `api_county_code` | str | 3-digit RRC/API county code identifying the county where the well is located |
+| `api_unique_no` | str | 5-digit unique number assigned by the RRC to identify this wellbore |
+| `county_name` | str | Name of the county |
+| `wellbore_location_code` | category | Surface location of the wellbore: `L` = Land, `O` = Offshore, `I` = Inland Waterway, `B` = Bay/Estuary |
+| `api_no` | str | Constructed 8-digit RRC API number (`api_county_code` zero-padded to 3 digits + `api_unique_no` zero-padded to 5 digits). Matches the API8 format used in the RRC well shapefiles. |
 
 ---
 
-### `lease_well_coordinates.geoparquet`
-Grain: one row per well, with point geometry in WGS84 (EPSG:4326). Contains all columns from `well_api_lease.parquet` plus the columns below, added by joining to RRC county shapefiles.
+### `lease_well_coordinates.parquet` / `.geoparquet`
+
+Contains all columns from `well_api_lease.parquet` plus:
 
 | Column | Type | Description |
-|--------|------|-------------|
-| `lease_key` | string | Composite key: `OIL_GAS_CODE_DISTRICT_NO_LEASE_NO` |
-| `api8` | string | Normalized 8-digit API number used to join to GIS shapefiles |
-| `longitude` | float | Well surface longitude in decimal degrees (WGS84) |
-| `latitude` | float | Well surface latitude in decimal degrees (WGS84) |
-| `geometry` | geometry | Point geometry (WGS84, EPSG:4326) |
-| `source_zip` | string | Source county shapefile zip filename |
-| `source_shp` | string | Source `.shp` filename within the zip |
-| `well_layer_type` | string | Layer type from the RRC shapefile (e.g. surface point, bottom hole) |
-| `API`, `API10`, `APINUM` | string | Raw API identifier fields from the shapefile, when present |
-| `LAT27`, `LONG27` | float | Original NAD27 coordinates from the shapefile, when present |
-| `LAT83`, `LONG83` | float | NAD83 coordinates from the shapefile, when present |
-| `RELIAB`, `SYMBOL`, `SYMNUM` | string | Shapefile metadata fields, when present |
+|---|---|---|
+| `oil_gas_code_norm` | str | Normalized oil/gas code (uppercase, stripped) |
+| `district_no_norm` | str | Normalized district number (zero-padded to 2 digits for numeric districts; alpha-numeric districts like `8A`, `7B` left as-is) |
+| `lease_no_norm` | str | Normalized lease number (zero-padded to 5 digits) |
+| `lease_key` | str | Stable join key: `{oil_gas_code_norm}_{district_no_norm}_{lease_no_norm}` |
+| `api8_from_components` | str | API8 reconstructed from `api_county_code` + `api_unique_no` components |
+| `api8_from_api_no` | str | API8 normalized from the `api_no` field |
+| `api8` | str | Final API8 (prefers `api8_from_components`; falls back to `api8_from_api_no`) |
+| `longitude` | float | Well longitude in WGS84 decimal degrees (from RRC shapefile) |
+| `latitude` | float | Well latitude in WGS84 decimal degrees (from RRC shapefile) |
+| `SOURCE_ZIP` | str | Source zip filename within the Well Layers dataset |
+| `SOURCE_SHP` | str | Source shapefile name within the zip |
+| `well_layer_type` | str | Whether the shapefile represents a `surface` or `bottom` wellbore location |
+| `LAT27` | float | Original NAD27 latitude from shapefile (before reprojection), if present |
+| `LONG27` | float | Original NAD27 longitude from shapefile (before reprojection), if present |
+| `LAT83` | float | NAD83 latitude from shapefile, if present |
+| `LONG83` | float | NAD83 longitude from shapefile, if present |
+| `RELIAB` | str | RRC reliability code for the coordinate, if present |
+| `WELLID` | str | RRC internal well ID from shapefile, if present |
+| `geometry` | geometry | Point geometry in WGS84 (GeoParquet only) |
 
 ---
 
 ### `wells_per_lease.parquet`
-Grain: one row per lease. Used by notebook 4 to distribute lease-level volumes across wells.
 
 | Column | Type | Description |
-|--------|------|-------------|
-| `lease_key` | string | Composite key: `OIL_GAS_CODE_DISTRICT_NO_LEASE_NO` |
-| `n_wells_with_coordinates` | int | Count of distinct API8 numbers with valid coordinates for this lease |
-| `lease_latitude` | float | Centroid latitude of all wells in the lease (decimal degrees, WGS84) |
-| `lease_longitude` | float | Centroid longitude of all wells in the lease (decimal degrees, WGS84) |
+|---|---|---|
+| `lease_key` | str | Stable join key |
+| `n_wells_with_coordinates` | int | Number of distinct wells on the lease that have a matched coordinate in the shapefile data |
+| `lease_latitude` | float | Centroid latitude for the lease (mean of all well coordinates, computed in Albers projection) in WGS84 |
+| `lease_longitude` | float | Centroid longitude for the lease in WGS84 |
 
 ---
 
-### `prod_per_well_approx.parquet` / `prod_per_well_approx.geoparquet`
-Grain: one row per well per production month. All volume columns have been divided by `n_wells_with_coordinates`, distributing the lease total equally across wells.
+### `tot_prod_with_lease_coord.parquet` / `.geoparquet`
 
-> ⚠️ These are **approximations**. Each well in a lease receives an equal share of lease-level volumes. Actual per-well production is not available in the public RRC data.
-
-**Identity and spatial columns**
+All columns from `texas_total_prod.parquet`, plus:
 
 | Column | Type | Description |
-|--------|------|-------------|
+|---|---|---|
+| `n_wells_with_coordinates` | int | Number of wells on the lease with matched coordinates |
+| `county_name` | str | County name (from well data, joined via lease key) |
+| `lease_longitude` | float | Lease centroid longitude (WGS84) |
+| `lease_latitude` | float | Lease centroid latitude (WGS84) |
+| `geometry` | geometry | Centroid point geometry in WGS84 (GeoParquet only) |
+
+---
+
+### `prod_per_well_approx.parquet` / `.geoparquet`
+
+All oil and casinghead gas disposition columns from `texas_prod_disp.parquet`, but with volumes **divided by `n_wells_with_coordinates`** to produce per-well approximations, plus:
+
+| Column | Type | Description |
+|---|---|---|
+| `lease_key` | str | Stable join key |
 | `date` | datetime | Production month |
-| `lease_key` | string | Composite lease identifier |
-| `field_no` | string | RRC field number |
-| `operator_no` | string | RRC operator ID |
-| `operator_name` | string | Operator name |
-| `api8` | string | 8-digit API number for the well |
-| `well_no` | string | Well number within the lease |
-| `county_name` | string | County name |
-| `longitude` | float | Well surface longitude (WGS84) |
-| `latitude` | float | Well surface latitude (WGS84) |
-| `geometry` | geometry | Point geometry — `.geoparquet` only |
+| `api8` | str | 8-digit API number identifying the individual well |
+| `well_no` | str | Well number within the lease |
+| `county_name` | str | County name |
+| `longitude` | float | Individual well longitude (WGS84) — this is the well's own surface location, not the lease centroid |
+| `latitude` | float | Individual well latitude (WGS84) |
+| `geometry` | geometry | Point geometry in WGS84 (GeoParquet only) |
 
-**Per-well approximated volume columns** (lease total ÷ `n_wells_with_coordinates`)
-
-| Column | Units | Description |
-|--------|-------|-------------|
-| `oil_pipeline_bbl` | BBL | Oil moved by pipeline, per well |
-| `oil_truck_bbl` | BBL | Oil moved by truck, per well |
-| `csgd_field_ops_fuel_mcf` | MCF | Casinghead gas used for field ops fuel, per well |
-| `csgd_transmission_mcf` | MCF | Casinghead gas to transmission line, per well |
-| `csgd_processing_plant_mcf` | MCF | Casinghead gas to processing plant, per well |
-| `csgd_vented_flared_mcf` | MCF | Casinghead gas vented or flared, per well |
-| `csgd_gas_lift_mcf` | MCF | Casinghead gas used for gas lift, per well |
-| `csgd_repressure_mcf` | MCF | Casinghead gas used for repressure, per well |
-| `oil_sold_total_bbl` | BBL | Total oil sold (pipeline + truck + tank car), per well |
-| `total_vented_flared_mcf` | MCF | Total gas vented or flared (all sources), per well |
+> ⚠️ **All production/disposition volume columns in this file are approximate per-well estimates.** They are computed by dividing the lease-level monthly volume equally across the number of wells with known coordinates. Wells on the same lease in the same month will have identical volume values. This is a spatial proxy, not a measured per-well production figure.
 
 ---
 
-## Data Source Reference
+### Permian Basin Output Files (`permian_only/`)
 
-The PDQ dump is a full export of the RRC's Production Data and Historical Ledger databases. Key tables used in this pipeline:
+These files contain the same columns as their Texas-wide counterparts (described above), filtered to wells and leases whose coordinates fall within the Permian Basin bounding box. They are saved as **CSV** instead of Parquet. GeoParquet files with geometry columns have an additional `geometry_wkt` column containing the geometry in Well-Known Text (WKT) string format (since CSVs cannot store native geometry objects).
 
-| Table | Used in | Description |
-|-------|---------|-------------|
-| `OG_LEASE_CYCLE` | Notebook 1 | Monthly production volumes by lease |
-| `OG_LEASE_CYCLE_DISP` | Notebook 1 | Monthly disposition volumes by lease |
-| `OG_WELL_COMPLETION` | Notebook 2 | Well completion records with API numbers |
-
-For full column definitions, see the `pdq-dump-user-manual.pdf` included in this folder.
+| File | Source dataset |
+|---|---|
+| `permian_wells_with_locn_and_id.csv` | `lease_well_coordinates.geoparquet` |
+| `permian_wells_per_lease.csv` | `wells_per_lease.parquet` |
+| `permian_tot_prod_with_lease_coord.csv` | `tot_prod_with_lease_coord.geoparquet` |
+| `permian_prod_per_well_approx.csv` | `prod_per_well_approx.geoparquet` |
+| `permian_prod_per_well_approx_small.csv` | Same as above, with `field_no`, `operator_name`, `well_no`, `county_name`, and `geometry` columns dropped |
 
 ---
 
-## Dependencies
+## Data Caveats
 
-```
-pandas
-geopandas
-pyogrio        # fast shapefile reader (fallback: fiona)
-tqdm
-pathlib        # standard library
-zipfile        # standard library
-```
-
-All notebooks use `latin-1` encoding and `}` as the delimiter when reading `.dsv` files from the PDQ zip.
+- **Lease-level granularity:** Texas RRC public data tracks production at the lease level. Individual well volumes are not reported. All "per-well" figures in this pipeline are equal-split approximations.
+- **Coordinate match rate:** Not all wells in the PDQ completion table have a matching entry in the well shapefile dataset. Wells without coordinates are excluded from spatial outputs.
+- **Oil only:** This pipeline intentionally filters to oil leases (`OIL_GAS_CODE == "O"`). Gas from gas wells is not included. The casinghead gas captured here is co-produced gas from oil operations.
+- **Date coverage:** The PDQ dataset covers 1993 to present. The `prod_per_well_approx` outputs are filtered to post-2011 data.
+- **Lease key joins:** The `lease_key` field is the primary join key across all files. It normalizes and concatenates `oil_gas_code`, `district_no`, and `lease_no`. Any mismatch in formatting between source tables (e.g., different zero-padding) is handled by the normalization functions in the notebooks.
