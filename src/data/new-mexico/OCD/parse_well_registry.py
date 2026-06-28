@@ -3,7 +3,7 @@ import os
 
 # 1. Setup paths
 project_root = os.path.expanduser('~/work/projects/summer26-permian-flaring')
-input_csv = os.path.join(project_root, 'data/raw/new-mexico/New_Mexico_OCD_Oil_and_Gas_Wells.csv')
+input_csv = os.path.join(project_root, 'data/raw/new-mexico/OCD/New_Mexico_OCD_Oil_and_Gas_Wells.csv')
 output_dir = os.path.join(project_root, 'data/interim/new-mexico')
 output_csv = os.path.join(output_dir, 'nm_wells_spatial.csv')
 
@@ -41,9 +41,9 @@ df_wells.rename(columns={
     'longitude': 'Longitude'
 }, inplace=True)
 
-# 4. Optional: Filter for the Permian Basin (Lea and Eddy Counties)
-# (Codes 15 = Eddy, 25 = Lea)
-df_permian_wells = df_wells[df_wells['County_Code'].isin(['15', '25', '015', '025'])].copy()
+# 4. Optional: Filter for the Permian Basin (Lea, Eddy, Chaves and Roosevelt Counties)
+# (Codes 15 = Eddy, 25 = Leam, 05 = Chaves, 41 = Roosevelt)
+df_permian_wells = df_wells[df_wells['County_Code'].isin(['15', '25', '015', '025', '005', '05', '041', '41'])].copy()
 
 # 5. Export
 print(f"Extraction complete.")

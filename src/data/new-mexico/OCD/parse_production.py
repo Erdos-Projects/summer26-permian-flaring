@@ -15,13 +15,13 @@ row_tag = f"{ns}wcproduction"
 
 print(f"Reading from: {input_xml}")
 print(f"Writing to: {output_csv}")
-print("Starting streaming extraction (filtering for Lea/Eddy counties and O/G only)...")
+print("Starting streaming extraction (filtering for Lea/Eddy/Chaves/Roosevelt counties and O/G only)...")
 
 with open(output_csv, 'w', newline='', encoding='utf-8') as csvfile:
     csvwriter = csv.writer(csvfile)
     
     # Header includes Operator_ID
-    csvwriter.writerow(['API_Number', 'Operator_ID', 'Year', 'Month', 'Product_Kind', 'Volume'])
+    csvwriter.writerow(['API_Number', 'Operator_ID', 'Year', 'Month', 'Product_Kind', 'Volume','Prodn_Days'])
 
     with open(input_xml, 'rb') as xml_file:
         context = ET.iterparse(xml_file, events=('end',))
@@ -38,7 +38,7 @@ with open(output_csv, 'w', newline='', encoding='utf-8') as csvfile:
                 cnty_node = elem.find(f'{ns}api_cnty_cde')
                 cnty_str = cnty_node.text.strip() if cnty_node is not None and cnty_node.text else ""
                 
-                if cnty_str in ['25', '15', '015', '025']:
+                if cnty_str in ['25', '15', '015', '025', '005', '05', '041', '41']:
                     
                     # Filter by Product Kind (Oil 'O' or Gas 'G')
                     knd_node = elem.find(f'{ns}prd_knd_cde')
@@ -66,13 +66,15 @@ with open(output_csv, 'w', newline='', encoding='utf-8') as csvfile:
                         yr_node = elem.find(f'{ns}prodn_yr')
                         mth_node = elem.find(f'{ns}prodn_mth')
                         amt_node = elem.find(f'{ns}prod_amt')
+                        days_node = elem.find(f'{ns}prodn_day_num')
                         
                         year = yr_node.text.strip() if yr_node is not None and yr_node.text else ""
                         month = mth_node.text.strip() if mth_node is not None and mth_node.text else ""
                         prod_amt = amt_node.text.strip() if amt_node is not None and amt_node.text else "0"
-                        
+                        prodn_days = days_node.text.strip() if days_node is not None and days_node.text else "0"
+
                         # Write the row
-                        csvwriter.writerow([api_formatted, operator_id, year, month, prd_kind, prod_amt])
+                        csvwriter.writerow([api_formatted, operator_id, year, month, prd_kind, prod_amt, prodn_days])
 
                 # Memory Management
                 elem.clear()
