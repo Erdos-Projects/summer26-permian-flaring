@@ -16,8 +16,8 @@ import argparse
 import pandas as pd
 
 # ----------------------- FILTER SETTINGS: EDIT HERE -----------------------
-LAT_MIN, LAT_MAX = 31.0, 33.5            # Permian bounding box
-LON_MIN, LON_MAX = -104.5, -101.0
+LAT_MIN, LAT_MAX = 29.462935, 34.021515            # Permian bounding box
+LON_MIN, LON_MAX = -105.21988, -100.036107
 KEEP_ISO        = {"USA"}                 # set to None to keep all countries
 KEEP_CATEGORIES = None                 # set to None to keep all categories
 # Delaware sub-basin box (the DiD straddle region) -> in_delaware flag
