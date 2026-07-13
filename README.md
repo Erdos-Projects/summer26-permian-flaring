@@ -1,5 +1,12 @@
 # Flaring in the Permian: what satellites see and what operators report
 
+**Team Members**
+
+| Abhishek Koparde | Amey Joshi | Sabarenath Jayaprakash | Vineeth Krishna Talasila |
+|---|---|---|---|
+| [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/abhishek-koparde-74260010b/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amey-joshi-7b9764187/) [![Website](https://img.shields.io/badge/Website-14532D?style=flat)](https://iamjoshiamey.github.io/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/sabarenath-jayaprakash-00b94a254/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/vineethktalasila/) |
+
+
 ## Motivation
 
 Every night, satellites operated by NASA and NOAA image the Earth's surface. Several data products are built on the Visible Infrared Imaging Radiometer Suite ([VIIRS](https://www.earthdata.nasa.gov/data/instruments/viirs)): NASA's Black Marble, and the Nightfire (VNF) product from the Earth Observation Group (EOG) at the Colorado School of Mines. Nightfire detects combustion sources by their thermal signature and publishes multiyear, site-level temporal profiles of radiant heat (RH), where a "site" is a location with a persistent fire-like heat signature.
