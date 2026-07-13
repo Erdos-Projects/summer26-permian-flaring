@@ -33,8 +33,8 @@ COL_ISO, COL_CAT = "ISO", "Category"
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--catalog", default="multiyear_catalog_2012_2021_v20230525.csv")
-    ap.add_argument("--out", default="permian_sites_full.csv")
+    ap.add_argument("--catalog", default="../../../data/processed/nightfire/multiyear_catalog_2012_2021_v20230525.csv")
+    ap.add_argument("--out", default="../../../data/processed/nightfire/permian_sites_full.csv")
     args = ap.parse_args()
 
     cat = pd.read_csv(args.catalog)

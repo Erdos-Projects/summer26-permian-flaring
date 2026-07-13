@@ -11,11 +11,24 @@ oil-only per-site flaring series.
 Put these four files in one folder:
 
 ```
-permian-flaring/
+./src/data/nightfire/
+
 ├── filter_permian_catalog.py
 ├── datadownload.py
 ├── clean_by_category.py
-└── multiyear_catalog_2012_2021_v20230525.csv
+└── 
+```
+
+Put the following catalog file in the data folder:
+
+```
+./data/processed/nightfire
+
+multiyear_catalog_2012_2021_v20230525.csv
+```
+
+```
+The catalog file can be downloaded from the EOG website, URL: https://eogdata.mines.edu/wwwdata/downloads/VNF_multiyear_2012-2021/multiyear_catalog_2012_2021_v20230525.csv
 ```
 
 You'll add `eog_cookie.txt` in Step 2. After a run the folder also contains
@@ -45,11 +58,11 @@ step with a fresh one and re-run.
 ```
 python filter_permian_catalog.py
 ```
-→ `permian_sites_full.csv` (~2,254 sites in the lat/long box).
+→ `permian_sites_full.csv` (~2,328 sites in the lat/long box).
 
-**2. Download (~2,251 files; resumable):**
+**2. Download (~2,324 files; resumable):**
 ```
-python datadownload.py --catalog permian_sites_full.csv --out vnf_sites --cookie-file eog_cookie.txt
+python datadownload.py --catalog ../../../data/processed/nightfire/permian_sites_full.csv --out ../../../data/processed/nightfire/vnf_sites --cookie-file eog_cookie.txt
 ```
 Safe to interrupt and re-run — already-downloaded files are skipped. If the
 cookie expires it stops cleanly; refresh `eog_cookie.txt` and run the same
@@ -57,9 +70,28 @@ command again. A few `404`s in the summary are normal.
 
 **3. Remove non-oil sites:**
 ```
-python clean_by_category.py --catalog permian_sites_full.csv --dir vnf_sites
+python clean_by_category.py --catalog ../../../data/processed/nightfire/permian_sites_full.csv --dir ../../../data/processed/nightfire/vnf_sites
 ```
 → moves refinery / power-plant / chemical files to `vnf_sites/_excluded/`.
+
+**4. Aggregate monthly:**
+```
+python aggregate_vnf_monthly.py ../../../data/processed/nightfire/vnf_sites ../../../data/processed/nightfire/vnf_sites_aggregated
+```
+→ creates folder ../../../data/processed/nightfire/vnf_sites_aggregated with site wise monthly time series files.
+
+**5. Aggregate monthly with cloud masks:**
+```
+python aggregate_vnf_monthly_with_cloud_mask.py ../../../data/processed/nightfire/vnf_sites ../../../data/processed/nightfire/vnf_sites_aggregated_with_cloud_mask
+```
+→ creates folder ../../../data/processed/nightfire/vnf_sites_aggregated_with_cloud_mask with site wise monthly time series files which have more granular cloud mask data.
+
+**6. Create a single csv:**
+```
+python combinecsvs.py ../../../data/processed/nightfire/vnf_sites_aggregated
+python combinecsvs.py ../../../data/processed/nightfire/vnf_sites_aggregated_with_cloud_mask
+```
+→ combines the sitewise csvs into one big csv file.
 
 ---
 
@@ -67,7 +99,7 @@ python clean_by_category.py --catalog permian_sites_full.csv --dir vnf_sites
 
 ```
 vnf_sites/
-├── site_<id>_multiyear_vnf_series.csv   # ~2,251 oil-site series
+├── site_<id>_multiyear_vnf_series.csv   # ~2,324 oil-site series
 ├── _excluded/                           # non-oil sites, set aside
 ├── _manifest.csv                        # download status per id
 └── _category_cleaning.csv               # what was moved
