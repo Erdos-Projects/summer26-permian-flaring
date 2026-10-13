@@ -4,7 +4,7 @@
 
 | Abhishek Koparde | Amey Joshi | Sabarenath Jayaprakash | Vineeth Krishna Talasila |
 |---|---|---|---|
-| [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=flat&logo=linkedin&logoColor=white)]([https://www.linkedin.com/in/abhishek-koparde-74260010b/](https://www.linkedin.com/in/abhikop/)) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amey-joshi-7b9764187/) [![Website](https://img.shields.io/badge/Website-14532D?style=flat)](https://iamjoshiamey.github.io/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/sabarenath-jayaprakash-00b94a254/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/vineethktalasila/) |
+| [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/abhikop/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/amey-joshi-7b9764187/) [![Website](https://img.shields.io/badge/Website-14532D?style=flat)](https://iamjoshiamey.github.io/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/sabarenath-jayaprakash-00b94a254/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/vineethktalasila/) |
 
 
 ## Motivation
